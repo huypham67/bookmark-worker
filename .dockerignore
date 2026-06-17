@@ -1,0 +1,38 @@
+# IDE & OS junk
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Git & CI (not needed inside the build)
+.git
+.gitignore
+.github/
+
+# Go build & test artifacts (regenerated inside the image)
+bin/
+bookmark-worker
+*.exe
+*.test
+*.out
+*.tmp
+*.log
+vendor/
+coverage/
+coverage_report/
+coverage.html
+coverage.tmp
+
+# Local env & secrets
+.env
+.env.*
+*.pem
+keys/
+
+# Docs & notes not needed in the builder
+README.md
+LICENSE
+CLAUDE.md
+PLAN_WORKER.md
