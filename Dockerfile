@@ -38,7 +38,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -coverprofile=coverage.tmp \
       -covermode=atomic \
       -coverpkg=${COVERPKG} \
-      -p 1 && \
+      -p 1 \
+      -timeout 60s && \
     grep -v -E "${COVERAGE_EXCLUDE}" coverage.tmp > ${_OUTPUTDIR}/coverage.out && \
     go tool cover -html=${_OUTPUTDIR}/coverage.out -o ${_OUTPUTDIR}/coverage.html
 

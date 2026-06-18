@@ -7,19 +7,20 @@ import (
 
 	"github.com/huypham67/bookmark-common/pkg/logger"
 	pkgRedis "github.com/huypham67/bookmark-common/pkg/redis"
+	"github.com/huypham67/bookmark-common/pkg/sqldb"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 
 	bookmarkHandler "github.com/huypham67/bookmark-worker/internal/handler/bookmark"
 	bookmarkRepo "github.com/huypham67/bookmark-worker/internal/repository/bookmark"
+	cacheRepo "github.com/huypham67/bookmark-worker/internal/repository/cache"
 	"github.com/huypham67/bookmark-worker/internal/repository/queue"
 	bookmarkSvc "github.com/huypham67/bookmark-worker/internal/service/bookmark"
 	"github.com/huypham67/bookmark-worker/internal/worker"
 )
 
-// App is the worker. It dequeues jobs from a Redis list and dispatches them to
-// the import handler. No pool, no graceful drain — a single poll loop, kept
-// deliberately simple.
+// App wires all worker dependencies and runs the job processing loop.
 type App struct {
 	cfg        *Config
 	redis      *redis.Client
@@ -27,7 +28,7 @@ type App struct {
 	handler    bookmarkHandler.Handler
 }
 
-// NewApp initializes logging, config, the Redis client and the job pipeline.
+// NewApp initializes logging, config, Redis and DB clients, and the full job processing pipeline.
 func NewApp() (*App, error) {
 	if err := logger.NewClient(""); err != nil {
 		return nil, err
@@ -35,29 +36,36 @@ func NewApp() (*App, error) {
 
 	cfg, err := NewConfig()
 	if err != nil {
-		log.Error().Err(err).Msg("failed to load config")
 		return nil, err
 	}
 
 	rdb, err := pkgRedis.NewClient("")
 	if err != nil {
-		log.Error().Err(err).Msg("failed to initialize redis client")
 		return nil, err
 	}
 
-	log.Info().Str("queue", cfg.QueueKey).Msg("application initialized successfully")
+	db, err := sqldb.NewClient("")
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info().
+		Str("queue", cfg.QueueKey).
+		Int("workers", cfg.WorkerCount).
+		Msg("application initialized")
 
 	return &App{
 		cfg:        cfg,
 		redis:      rdb,
 		subscriber: initRedisSubscriber(rdb),
-		handler:    initImportHandler(),
+		handler:    initImportHandler(db, rdb),
 	}, nil
 }
 
-func initImportHandler() bookmarkHandler.Handler {
-	repo := bookmarkRepo.NewRepository()
-	svc := bookmarkSvc.NewService(repo)
+func initImportHandler(db *gorm.DB, rdb *redis.Client) bookmarkHandler.Handler {
+	repo := bookmarkRepo.NewRepository(db)
+	cache := cacheRepo.NewRedis(rdb)
+	svc := bookmarkSvc.NewService(repo, cache)
 	return bookmarkHandler.NewHandler(svc)
 }
 
@@ -71,8 +79,6 @@ func (a *App) Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	pool := worker.NewPool(a.subscriber, a.handler, a.cfg.QueueKey, a.cfg.WorkerCount, a.cfg.JobBufferSize)
-
-	log.Info().Int("workers", a.cfg.WorkerCount).Msg("worker started, polling for jobs...")
+	pool := worker.NewPool(a.subscriber, a.handler, a.cfg.QueueKey, a.cfg.WorkerCount, a.cfg.JobBufferSize, a.cfg.PollInterval)
 	return pool.Run(ctx)
 }

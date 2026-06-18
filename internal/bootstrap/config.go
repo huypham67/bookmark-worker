@@ -2,19 +2,21 @@ package bootstrap
 
 import (
 	"strings"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 )
 
-// Config holds the configuration for the worker service.
+// Config holds runtime configuration for the worker, loaded from environment variables.
 type Config struct {
-	ServiceName   string `envconfig:"SERVICE_NAME" required:"true"`
-	QueueKey      string `envconfig:"QUEUE_KEY" default:"bookmark:import:jobs"`
-	WorkerCount   int    `envconfig:"WORKER_COUNT" default:"5"`
-	JobBufferSize int    `envconfig:"JOB_BUFFER_SIZE" default:"100"`
+	ServiceName   string        `envconfig:"SERVICE_NAME" required:"true"`
+	QueueKey      string        `envconfig:"QUEUE_KEY" default:"bookmark:import:jobs"`
+	WorkerCount   int           `envconfig:"WORKER_COUNT" default:"5"`
+	JobBufferSize int           `envconfig:"JOB_BUFFER_SIZE" default:"100"`
+	PollInterval  time.Duration `envconfig:"POLL_INTERVAL" default:"1s"`
 }
 
-// NewConfig loads worker configuration from environment variables.
+// NewConfig reads and validates worker configuration from environment variables.
 func NewConfig() (*Config, error) {
 	cfg := &Config{}
 

@@ -11,7 +11,7 @@ type redisSubscriber struct {
 	client *redis.Client
 }
 
-// NewRedisSubscriber returns a new Subscriber that uses the provided Redis client to dequeue jobs from a named queue.
+// NewRedisSubscriber returns a Subscriber that dequeues jobs from Redis using RPOP.
 func NewRedisSubscriber(client *redis.Client) Subscriber {
 	return &redisSubscriber{
 		client: client,

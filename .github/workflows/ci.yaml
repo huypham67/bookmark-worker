@@ -1,0 +1,79 @@
+name: ci-pipeline
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  pull_request:
+    branches:
+      - "main"
+
+env:
+  REGISTRY: docker.io
+  COVERAGE_THRESHOLD: 80
+  CACHE_FROM: type=gha
+  CACHE_TO: type=gha,mode=max
+
+jobs:
+  ci-flow:
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate image tag
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "image_tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "image_tag=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Run isolation tests and check coverage
+        run: make docker-test
+        env:
+          CACHE_FROM: ${{ env.CACHE_FROM }}
+          CACHE_TO: ${{ env.CACHE_TO }}
+          COVERAGE_THRESHOLD: ${{ env.COVERAGE_THRESHOLD }}
+
+      - name: SonarCloud Code Analysis & SAST Scan
+        run: make docker-sonar
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        run: make docker-login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        if: github.event_name != 'pull_request'
+        run: make docker-build-push
+        env:
+          CACHE_FROM: ${{ env.CACHE_FROM }}
+          GIT_REF_TYPE: ${{ github.ref_type }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+          GIT_EVENT_NAME: ${{ github.event_name }}
+          GIT_SHA: ${{ github.sha }}
+
+  trigger-deployment:
+    name: Trigger CD
+    needs: ci-flow
+    if: github.event_name != 'pull_request' && github.ref_name == 'main'
+    uses: ./.github/workflows/cd.yaml
+    with:
+      image_tag: ${{ needs.ci-flow.outputs.image_tag }}

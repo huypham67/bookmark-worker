@@ -1,0 +1,40 @@
+name: cd-pipeline
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Deploy Application via Docker Compose Engine
+        working-directory: /opt/bookmark-system
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -e
+
+          touch .env
+          grep -v '^BOOKMARK_WORKER_TAG=' .env > .env.tmp || true
+          echo "BOOKMARK_WORKER_TAG=${IMAGE_TAG}" >> .env.tmp
+          mv .env.tmp .env
+          echo "::notice title=CD Status::🚀 Initiating deployment for image tag: [${IMAGE_TAG}]"
+
+          echo "🔍 Validating docker-compose configuration syntax..."
+          docker compose config > /dev/null
+
+          echo "📥 Pulling container image layer: [${IMAGE_TAG}]..."
+          docker compose pull bookmark-worker
+
+          echo "🔄 Recreating single-container production target..."
+          docker compose up -d --force-recreate bookmark-worker
+
+          echo "🧹 Purging architectural stale images..."
+          docker image prune -f
+
+          echo "✅ CD Pipeline executed successfully. Deployment completed."

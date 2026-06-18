@@ -26,14 +26,14 @@ type Pool struct {
 	wg           sync.WaitGroup
 }
 
-// NewPool wires a pool with workerCount workers and a buffered job channel.
-func NewPool(sub queue.Subscriber, h bookmarkHandler.Handler, queueKey string, workerCount, bufferSize int) *Pool {
+// NewPool creates a Pool with workerCount workers and a job channel of bufferSize.
+func NewPool(sub queue.Subscriber, h bookmarkHandler.Handler, queueKey string, workerCount, bufferSize int, pollInterval time.Duration) *Pool {
 	return &Pool{
 		subscriber:   sub,
 		handler:      h,
 		queueKey:     queueKey,
 		workerCount:  workerCount,
-		pollInterval: time.Second,
+		pollInterval: pollInterval,
 		jobs:         make(chan []byte, bufferSize),
 	}
 }
@@ -41,19 +41,22 @@ func NewPool(sub queue.Subscriber, h bookmarkHandler.Handler, queueKey string, w
 // Run starts the workers and blocks polling until ctx is cancelled, then drains
 // in-flight jobs before returning.
 func (p *Pool) Run(ctx context.Context) error {
+	log.Info().Int("workers", p.workerCount).Str("queue", p.queueKey).Msg("worker pool started")
+
 	for i := 0; i < p.workerCount; i++ {
-		w := NewWorker(i+1, p.jobs, p.handler) // worker IDs are 1-indexed for logging
-		p.wg.Add(1)
-		go func() {
-			defer p.wg.Done()
+		w := NewWorker(i+1, p.jobs, p.handler)
+		log.Info().Int("worker_id", w.id).Msg("worker started")
+		p.wg.Go(func() {
 			p.supervise(w)
-		}()
+		})
 	}
 
-	p.poll(ctx) // blocks until ctx.Done()
+	p.poll(ctx)
 
-	close(p.jobs) // no more jobs -> workers exit their range loop
-	p.wg.Wait()   // wait for buffered jobs to drain
+	log.Info().Msg("shutdown signal received, draining jobs")
+	close(p.jobs)
+	p.wg.Wait()
+	log.Info().Msg("worker pool stopped")
 	return nil
 }
 
@@ -100,11 +103,14 @@ func (p *Pool) supervise(w *Worker) {
 func (p *Pool) runWorker(w *Worker) (exitedNormally bool) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error().
-				Interface("panic", r).
-				Str("stack", string(debug.Stack())).
+			ev := log.Error().
 				Int("worker_id", w.id).
-				Msg("worker panicked")
+				Bytes("stack", debug.Stack())
+			if err, ok := r.(error); ok {
+				ev.Err(err).Msg("worker panicked with error")
+			} else {
+				ev.Interface("panic", r).Msg("worker panicked")
+			}
 			exitedNormally = false
 		}
 	}()

@@ -2,12 +2,19 @@ package bookmark
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	bookmarkDTO "github.com/huypham67/bookmark-worker/internal/dto/bookmark"
 	bookmarkRepo "github.com/huypham67/bookmark-worker/internal/repository/bookmark"
+	cacheRepo "github.com/huypham67/bookmark-worker/internal/repository/cache"
 )
 
-// Service imports a batch of bookmarks delivered as a queue message.
+const cacheNamespace = "bookmarks"
+
+var ErrInternalServerError = errors.New("internal server error")
+
+// Service processes bookmark import jobs delivered from the queue.
 //
 //go:generate mockery --name=Service --output=./mocks --outpkg=mocks --filename=mock_service.go
 type Service interface {
@@ -15,12 +22,18 @@ type Service interface {
 }
 
 type service struct {
-	repo bookmarkRepo.Repository
+	repo      bookmarkRepo.Repository
+	cacheRepo cacheRepo.Repository
 }
 
-// NewService creates the bookmark import service.
-func NewService(repo bookmarkRepo.Repository) Service {
+// NewService returns a Service wired with the given repository and cache.
+func NewService(repo bookmarkRepo.Repository, cacheRepo cacheRepo.Repository) Service {
 	return &service{
-		repo: repo,
+		repo:      repo,
+		cacheRepo: cacheRepo,
 	}
+}
+
+func buildUserCacheKey(userID string) string {
+	return fmt.Sprintf("%s:%s", cacheNamespace, userID)
 }

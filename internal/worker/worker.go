@@ -17,7 +17,7 @@ type Worker struct {
 	handler bookmarkHandler.Handler
 }
 
-// NewWorker creates a worker bound to the shared job channel.
+// NewWorker creates a Worker that reads from the shared jobs channel.
 func NewWorker(id int, jobs <-chan []byte, h bookmarkHandler.Handler) *Worker {
 	return &Worker{
 		id:      id,
@@ -26,13 +26,10 @@ func NewWorker(id int, jobs <-chan []byte, h bookmarkHandler.Handler) *Worker {
 	}
 }
 
-// Run consumes jobs until the channel is closed.
+// Run processes jobs from the channel until it is closed.
 func (w *Worker) Run() {
 	for payload := range w.jobs {
-		log.Info().Int("worker_id", w.id).Str("payload", string(payload)).Msg("worker picked up job")
-
-		// Detached context so a job already popped from Redis finishes during
-		// the shutdown drain instead of being canceled and lost.
+		log.Info().Int("worker_id", w.id).Msg("received job")
 		if err := w.handler.Handle(context.Background(), payload); err != nil {
 			log.Error().Err(err).Int("worker_id", w.id).Msg("failed to handle job")
 		}

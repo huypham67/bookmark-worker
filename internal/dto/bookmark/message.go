@@ -7,10 +7,9 @@ type BookmarkCSVRecord struct {
 	URL         string `json:"url"`
 }
 
-// BookmarkImportMessage is the message format consumed from the import queue: a
-// batch of bookmark records for a specific import job.
+// BookmarkImportMessage is the job payload dequeued from the import queue.
 type BookmarkImportMessage struct {
-	JobID   string              `json:"job_id"`  // Unique identifier for the import job
-	UserID  string              `json:"user_id"` // ID of the user who initiated the import
-	Records []BookmarkCSVRecord `json:"records"` // Batch of bookmark records to be imported
+	JobID   string              `json:"job_id"`
+	UserID  string              `json:"user_id"`
+	Records []BookmarkCSVRecord `json:"records"`
 }
