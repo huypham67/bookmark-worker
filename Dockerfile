@@ -70,8 +70,7 @@ RUN chown -R ${SERVICE_USER}:${SERVICE_GROUP} /app && \
 
 USER ${SERVICE_USER}
 
-# A worker has no HTTP port; liveness is the binary process itself.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD pgrep -x bookmark-worker || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+    CMD kill -0 1 || exit 1
 
 CMD ["./bookmark-worker"]
