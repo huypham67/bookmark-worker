@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	bookmarkHandler "github.com/huypham67/bookmark-worker/internal/handler/bookmark"
 	"github.com/huypham67/bookmark-worker/internal/repository/queue"
 	queueMocks "github.com/huypham67/bookmark-worker/internal/repository/queue/mocks"
 	"github.com/stretchr/testify/assert"
@@ -20,9 +19,9 @@ type handlerFn func(context.Context, []byte) error
 
 func (h handlerFn) Handle(ctx context.Context, payload []byte) error { return h(ctx, payload) }
 
-var _ bookmarkHandler.Handler = (handlerFn)(nil)
+var _ Handler = (handlerFn)(nil)
 
-func newTestPool(t *testing.T, sub queue.Subscriber, h bookmarkHandler.Handler, workers, bufSize int) *Pool {
+func newTestPool(t *testing.T, sub queue.Subscriber, h Handler, workers, bufSize int) *Pool {
 	t.Helper()
 	return NewPool(sub, h, "test-queue", workers, bufSize, time.Millisecond)
 }
@@ -35,13 +34,13 @@ func TestPool_Run(t *testing.T) {
 		workers  int
 		bufSize  int
 		preStart func(*Pool)
-		build    func(*testing.T, context.Context) (queue.Subscriber, bookmarkHandler.Handler, <-chan struct{}, func(*testing.T))
+		build    func(*testing.T, context.Context) (queue.Subscriber, Handler, <-chan struct{}, func(*testing.T))
 	}{
 		{
 			name:    "processes all dequeued jobs",
 			workers: 2,
 			bufSize: 10,
-			build: func(t *testing.T, ctx context.Context) (queue.Subscriber, bookmarkHandler.Handler, <-chan struct{}, func(*testing.T)) {
+			build: func(t *testing.T, ctx context.Context) (queue.Subscriber, Handler, <-chan struct{}, func(*testing.T)) {
 				var handled atomic.Int32
 				done := make(chan struct{})
 
@@ -74,7 +73,7 @@ func TestPool_Run(t *testing.T) {
 				p.jobs <- []byte("b")
 				p.jobs <- []byte("c")
 			},
-			build: func(t *testing.T, ctx context.Context) (queue.Subscriber, bookmarkHandler.Handler, <-chan struct{}, func(*testing.T)) {
+			build: func(t *testing.T, ctx context.Context) (queue.Subscriber, Handler, <-chan struct{}, func(*testing.T)) {
 				var handled atomic.Int32
 
 				h := handlerFn(func(_ context.Context, _ []byte) error {
@@ -100,7 +99,7 @@ func TestPool_Run(t *testing.T) {
 			name:    "worker recovers from panic and processes next job",
 			workers: 1,
 			bufSize: 10,
-			build: func(t *testing.T, ctx context.Context) (queue.Subscriber, bookmarkHandler.Handler, <-chan struct{}, func(*testing.T)) {
+			build: func(t *testing.T, ctx context.Context) (queue.Subscriber, Handler, <-chan struct{}, func(*testing.T)) {
 				var handled atomic.Int32
 				var panicked atomic.Bool
 				done := make(chan struct{})
@@ -149,7 +148,7 @@ func TestPool_Run(t *testing.T) {
 				cancel()
 			}()
 
-			pool.Run(ctx)
+			_ = pool.Run(ctx)
 			verify(t)
 		})
 	}

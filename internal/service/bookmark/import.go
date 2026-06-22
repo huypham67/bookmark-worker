@@ -4,12 +4,16 @@ import (
 	"context"
 
 	bookmarkDTO "github.com/huypham67/bookmark-worker/internal/dto/bookmark"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog/log"
 )
 
 // Import invalidates the user's bookmark cache then bulk-inserts the records.
 // Cache invalidation runs first; if it fails the import is aborted to avoid serving stale data after a successful write.
 func (s *service) Import(ctx context.Context, msg bookmarkDTO.BookmarkImportMessage) error {
+	segment := newrelic.FromContext(ctx).StartSegment("service.bookmark.Import")
+	defer segment.End()
+
 	hashKey := buildUserCacheKey(msg.UserID)
 	if err := s.cacheRepo.DeleteCacheByHashKey(ctx, hashKey); err != nil {
 		log.Error().

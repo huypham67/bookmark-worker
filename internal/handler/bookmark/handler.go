@@ -1,25 +1,20 @@
 package bookmark
 
 import (
-	"context"
+	"github.com/newrelic/go-agent/v3/newrelic"
 
 	bookmarkSvc "github.com/huypham67/bookmark-worker/internal/service/bookmark"
 )
 
-// Handler decodes a raw queue payload and dispatches it to the import service.
-//
-//go:generate mockery --name=Handler --output=./mocks --outpkg=mocks --filename=mock_handler.go
-type Handler interface {
-	Handle(ctx context.Context, payload []byte) error
-}
-
 type handler struct {
 	service bookmarkSvc.Service
+	nrApp   *newrelic.Application
 }
 
-// NewHandler returns a Handler backed by the given service.
-func NewHandler(service bookmarkSvc.Service) Handler {
+// NewHandler returns a handler backed by the given service.
+func NewHandler(service bookmarkSvc.Service, nrApp *newrelic.Application) *handler {
 	return &handler{
 		service: service,
+		nrApp:   nrApp,
 	}
 }

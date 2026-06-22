@@ -1,0 +1,14 @@
+# Normalize line endings to LF for all text files, regardless of the OS the
+# commit is made from. Prevents CRLF churn that makes whole files look like
+# "new code" to SonarCloud (which then drags uncovered lines into the
+# new-code coverage gate). See bookmark-deployment/docs/observability.md notes.
+* text=auto eol=lf
+
+# Be explicit about source and config so a misconfigured editor can't override.
+*.go    text eol=lf
+*.mod   text eol=lf
+*.sum   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.sh    text eol=lf
