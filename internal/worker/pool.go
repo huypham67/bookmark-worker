@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	bookmarkHandler "github.com/huypham67/bookmark-worker/internal/handler/bookmark"
 	"github.com/huypham67/bookmark-worker/internal/repository/queue"
 )
 
@@ -18,7 +17,7 @@ import (
 // backpressure: the poller stops pulling from Redis once the buffer is full.
 type Pool struct {
 	subscriber   queue.Subscriber
-	handler      bookmarkHandler.Handler
+	handler      Handler
 	queueKey     string
 	workerCount  int
 	pollInterval time.Duration
@@ -27,7 +26,7 @@ type Pool struct {
 }
 
 // NewPool creates a Pool with workerCount workers and a job channel of bufferSize.
-func NewPool(sub queue.Subscriber, h bookmarkHandler.Handler, queueKey string, workerCount, bufferSize int, pollInterval time.Duration) *Pool {
+func NewPool(sub queue.Subscriber, h Handler, queueKey string, workerCount, bufferSize int, pollInterval time.Duration) *Pool {
 	return &Pool{
 		subscriber:   sub,
 		handler:      h,

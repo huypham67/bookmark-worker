@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestHandler(t *testing.T) (Handler, *svcMocks.Service) {
+func newTestHandler(t *testing.T) (*handler, *svcMocks.Service) {
 	t.Helper()
 	svc := svcMocks.NewService(t)
-	return NewHandler(svc), svc
+	return NewHandler(svc, nil), svc
 }
 
 func TestHandler_Handle(t *testing.T) {

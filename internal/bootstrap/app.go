@@ -6,79 +6,53 @@ import (
 	"syscall"
 
 	"github.com/huypham67/bookmark-common/pkg/logger"
-	pkgRedis "github.com/huypham67/bookmark-common/pkg/redis"
-	"github.com/huypham67/bookmark-common/pkg/sqldb"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
-
-	bookmarkHandler "github.com/huypham67/bookmark-worker/internal/handler/bookmark"
-	bookmarkRepo "github.com/huypham67/bookmark-worker/internal/repository/bookmark"
-	cacheRepo "github.com/huypham67/bookmark-worker/internal/repository/cache"
-	"github.com/huypham67/bookmark-worker/internal/repository/queue"
-	bookmarkSvc "github.com/huypham67/bookmark-worker/internal/service/bookmark"
 	"github.com/huypham67/bookmark-worker/internal/worker"
+	"github.com/rs/zerolog/log"
 )
 
-// App wires all worker dependencies and runs the job processing loop.
+// App manages the worker lifecycle.
 type App struct {
-	cfg        *Config
-	redis      *redis.Client
-	subscriber queue.Subscriber
-	handler    bookmarkHandler.Handler
+	container *Container
 }
 
-// NewApp initializes logging, config, Redis and DB clients, and the full job processing pipeline.
+// NewApp initializes logging and all worker dependencies.
 func NewApp() (*App, error) {
 	if err := logger.NewClient(""); err != nil {
 		return nil, err
 	}
 
-	cfg, err := NewConfig()
+	container, err := NewContainer()
 	if err != nil {
-		return nil, err
-	}
-
-	rdb, err := pkgRedis.NewClient("")
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := sqldb.NewClient("")
-	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize container")
 		return nil, err
 	}
 
 	log.Info().
-		Str("queue", cfg.QueueKey).
-		Int("workers", cfg.WorkerCount).
+		Str("queue", container.Config.QueueKey).
+		Int("workers", container.Config.WorkerCount).
 		Msg("application initialized")
 
-	return &App{
-		cfg:        cfg,
-		redis:      rdb,
-		subscriber: initRedisSubscriber(rdb),
-		handler:    initImportHandler(db, rdb),
-	}, nil
+	return &App{container: container}, nil
 }
 
-func initImportHandler(db *gorm.DB, rdb *redis.Client) bookmarkHandler.Handler {
-	repo := bookmarkRepo.NewRepository(db)
-	cache := cacheRepo.NewRedis(rdb)
-	svc := bookmarkSvc.NewService(repo, cache)
-	return bookmarkHandler.NewHandler(svc)
-}
-
-func initRedisSubscriber(rdb *redis.Client) queue.Subscriber {
-	return queue.NewRedisSubscriber(rdb)
-}
-
-// Run dispatches jobs to a worker pool until SIGINT/SIGTERM is received, then
-// drains in-flight jobs before returning.
+// Run dispatches jobs to a worker pool until SIGINT/SIGTERM is received.
 func (a *App) Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	pool := worker.NewPool(a.subscriber, a.handler, a.cfg.QueueKey, a.cfg.WorkerCount, a.cfg.JobBufferSize, a.cfg.PollInterval)
+	cfg := a.container.Config
+	pool := worker.NewPool(
+		a.container.Subscriber,
+		a.container.Handler,
+		cfg.QueueKey,
+		cfg.WorkerCount,
+		cfg.JobBufferSize,
+		cfg.PollInterval,
+	)
 	return pool.Run(ctx)
+}
+
+// Close gracefully shuts down all resources.
+func (a *App) Close() error {
+	return a.container.Close()
 }

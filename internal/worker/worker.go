@@ -4,9 +4,12 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
-
-	bookmarkHandler "github.com/huypham67/bookmark-worker/internal/handler/bookmark"
 )
+
+// Handler processes a raw queue payload.
+type Handler interface {
+	Handle(ctx context.Context, payload []byte) error
+}
 
 // Worker consumes jobs from a receive-only channel and dispatches each to the
 // handler. It owns no lifecycle: it runs until the channel is closed, leaving
@@ -14,11 +17,11 @@ import (
 type Worker struct {
 	id      int
 	jobs    <-chan []byte
-	handler bookmarkHandler.Handler
+	handler Handler
 }
 
 // NewWorker creates a Worker that reads from the shared jobs channel.
-func NewWorker(id int, jobs <-chan []byte, h bookmarkHandler.Handler) *Worker {
+func NewWorker(id int, jobs <-chan []byte, h Handler) *Worker {
 	return &Worker{
 		id:      id,
 		jobs:    jobs,
