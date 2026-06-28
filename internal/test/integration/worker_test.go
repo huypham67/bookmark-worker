@@ -26,7 +26,7 @@ const queueKey = "bookmark:import:jobs"
 
 // countingHandler wraps a real Handler and counts down wg after each job completes.
 type countingHandler struct {
-	inner bookmarkHandler.Handler
+	inner worker.Handler
 	wg    *sync.WaitGroup
 }
 
@@ -57,6 +57,7 @@ func newTestWorker(t *testing.T, jobCount int) *testWorker {
 			bookmarkRepo.NewRepository(db),
 			cacheRepo.NewRedis(rdb.Client),
 		),
+		nil,
 	)
 
 	h := &countingHandler{inner: inner, wg: &wg}
@@ -83,7 +84,7 @@ func (e *testWorker) push(t *testing.T, msg bookmarkDTO.BookmarkImportMessage) {
 func (e *testWorker) run(t *testing.T) context.CancelFunc {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	go e.pool.Run(ctx)
+	go func() { _ = e.pool.Run(ctx) }()
 	return cancel
 }
 

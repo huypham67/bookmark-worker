@@ -9,7 +9,8 @@ type BookmarkCSVRecord struct {
 
 // BookmarkImportMessage is the job payload dequeued from the import queue.
 type BookmarkImportMessage struct {
-	JobID   string              `json:"job_id"`
-	UserID  string              `json:"user_id"`
-	Records []BookmarkCSVRecord `json:"records"`
+	JobID         string              `json:"job_id"`
+	UserID        string              `json:"user_id"`
+	Records       []BookmarkCSVRecord `json:"records"`
+	TraceMetadata map[string]string   `json:"trace_metadata,omitempty"`
 }
